@@ -11,6 +11,7 @@ import Sidebar from './Sidebar'
 import Topbar from './Topbar'
 import getLayoutedElements from './useLayout'
 import PipelineAlert, { isDAG } from './PipelineAlert'
+import DetailPanel from './DetailPanel' // ✅ NEW
 
 const nodeTypes = { orchestrator: OrchestratorNode }
 const edgeTypes = { glowEdge: GlowEdge }
@@ -18,7 +19,7 @@ const edgeTypes = { glowEdge: GlowEdge }
 const initialNodes = [
   { id: '1', type: 'orchestrator', position: { x: 100, y: 150 }, data: { label: 'User Query',    nodeType: 'input'  } },
   { id: '2', type: 'orchestrator', position: { x: 380, y: 80  }, data: { label: 'System Prompt', nodeType: 'prompt' } },
-  { id: '3', type: 'orchestrator', position: { x: 380, y: 240 }, data: { label: 'GPT-4o',        nodeType: 'llm'    } },
+  { id: '3', type: 'orchestrator', position: { x: 380, y: 240 }, data: { label: 'GPT-4o',        nodeType: 'gpt4o'  } },
   { id: '4', type: 'orchestrator', position: { x: 660, y: 150 }, data: { label: 'Response',      nodeType: 'output' } },
 ]
 
@@ -36,6 +37,7 @@ function OrchestratorApp() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [rfInstance, setRfInstance] = useState(null)
   const [alertInfo, setAlertInfo] = useState(null)
+  const [selectedNode, setSelectedNode] = useState(null) // ✅ NEW
   const wrapperRef = useRef(null)
 
   const onConnect = useCallback(
@@ -62,16 +64,19 @@ function OrchestratorApp() {
     })
 
     const labels = {
-      input: 'Input', llm: 'LLM', prompt: 'Prompt',
-      memory: 'Memory', tool: 'Tool', output: 'Output',
-      transform: 'Transform', condition: 'Condition',
+      input: 'Input', gpt4o: 'GPT-4o', claude: 'Claude',
+      gemini: 'Gemini', llama: 'Llama 3', mistral: 'Mistral',
+      prompt: 'Prompt', memory: 'Memory', tool: 'Tool',
+      output: 'Output', transform: 'Transform', condition: 'Condition',
+      rag: 'RAG', vectorstore: 'Vector Store', apicall: 'API Call',
+      parser: 'Parser', router: 'Router',
     }
 
     setNodes((nds) => [...nds, {
       id: `node_${nodeId++}`,
       type: 'orchestrator',
       position,
-      data: { label: `${labels[nodeType]} ${nodeId}`, nodeType },
+      data: { label: `${labels[nodeType] || nodeType} ${nodeId}`, nodeType },
     }])
   }, [rfInstance, setNodes])
 
@@ -83,18 +88,30 @@ function OrchestratorApp() {
   const handleClear = () => {
     setNodes([])
     setEdges([])
+    setSelectedNode(null) // ✅ NEW - clear panel too
   }
 
   const handleLayout = () => {
-  const { nodes: ln, edges: le } = getLayoutedElements(nodes, edges)
-  setNodes(ln)
-  setEdges(le)
-}
+    const { nodes: ln, edges: le } = getLayoutedElements(nodes, edges)
+    setNodes(ln)
+    setEdges(le)
+  }
+
+  // ✅ NEW - open panel when node is clicked
+  const onNodeClick = useCallback((e, node) => {
+    setSelectedNode(node)
+  }, [])
+
+  // ✅ NEW - update node data when fields change in panel
+  const onNodeChange = useCallback((id, newData) => {
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, data: newData } : n))
+  }, [setNodes])
 
   return (
     <div style={{ width: '100vw', height: '100vh', background: '#080b14', display: 'flex', flexDirection: 'column' }}>
 
-<Topbar onSubmit={handleSubmit} onClear={handleClear} onLayout={handleLayout} />
+      <Topbar onSubmit={handleSubmit} onClear={handleClear} onLayout={handleLayout} />
+
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
         <Sidebar nodes={nodes.length} edges={edges.length} />
@@ -110,6 +127,7 @@ function OrchestratorApp() {
             onInit={setRfInstance}
             onDrop={onDrop}
             onDragOver={onDragOver}
+            onNodeClick={onNodeClick} // ✅ NEW
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             defaultEdgeOptions={{ type: 'glowEdge', animated: true }}
@@ -120,6 +138,13 @@ function OrchestratorApp() {
             <MiniMap />
           </ReactFlow>
         </div>
+
+        {/* ✅ NEW - detail panel on the right */}
+        <DetailPanel
+          node={selectedNode}
+          onChange={onNodeChange}
+          onClose={() => setSelectedNode(null)}
+        />
 
       </div>
 
